@@ -1,0 +1,235 @@
+<html>
+<body>
+<div id="fb-root"></div>
+<script src="FileSaver.js"></script>
+<script>
+
+var resultList    = [[]];  // query result will be store in here 
+var resultCheck   = [[]];  // check queries for one person are all done
+var queryTimes    = 4;     // query times
+var queryFriends  = 5;     // total number of friends you want to query for
+var friendsTotal  = 0;     // record friends numbers
+
+
+window.fbAsyncInit = function() {
+	FB.init({
+	  appId      : '1428692724035726', // App ID
+	  channelUrl : 'http://localhost:8080', // Channel File
+	  status     : true, // check login status
+	  cookie     : true, // enable cookies to allow the server to access the session
+	  xfbml      : true  // parse XFBML
+	});
+ 
+	FB.Event.subscribe('auth.authResponseChange', function(response) {
+		if (response.status === 'connected') {
+			console.log("Connected to Facebook");
+			//SUCCESS
+		}	 
+		else if (response.status === 'not_authorized') {
+			console.log("Failed to Connect");
+			//FAILED
+		} 
+		else {
+			console.log("unknow error");
+			//UNKNOWN ERROR
+		}
+	});	
+};
+ 
+function Login()
+{
+	FB.login(function(response) {
+		if (response.authResponse) {
+	    	getUserInfo(); 
+		} 
+		else {
+	    	 console.log('User cancelled login or did not fully authorize.');
+		}
+	},{scope: 'email, user_photos, read_stream, user_friends'}); // permissions with fb login
+}
+
+function getUserInfo() {
+    var str;
+	// reponse user information
+    FB.api('/me', function(response) {
+		if (response && !response.error) {
+			str = "<b>Name</b> : " + response.name + "<br>";
+			str += "<b>Link: </b>" + response.link + "<br>";
+			str += "<b>Username:</b> " + response.username + "<br>";
+			str += "<b>id: </b>" + response.id + "<br>";
+			str += "<b>Email:</b> " + response.email + "<br>";
+			str += "<input type='button' value='Get Photo' onclick='getPhoto();'/>";
+			str += "<input type='button' value='Logout' onclick='Logout();'/>";
+			document.getElementById("userInfo").innerHTML = str;
+ 
+			// file test (IE 10+ only)
+			// var temp = new ActiveXObject("Scripting.FileSystemObject");
+			// var file = temp.CreateTextFile("test.txt", false);
+			// file.WriteLine("Hello World");
+			// file.Close();
+		} else {
+			console.log("failed to get user information.");
+		}
+	});
+	
+	// response user friends list
+	FB.api('/me/friends', function(response) {
+		var friendsList = new Array();
+		if (response && !response.error) {
+			for (var i = 0; i < response.data.length; i++) {
+				var friend = new Object();
+				friend.name = response.data[i].name;
+				friend.id = response.data[i].id;
+				friendsList.push(friend);
+			}
+			friendsTotal = friendsList.length;
+			console.log("total friends : " + friendsList.length);
+			
+			// definite 2-d array space for resultList
+			for (var i = 0; i < friendsList.length; i++) {
+				resultList[i] = [];
+			}
+			// definite 2-d array space for resultCheck
+			for (var i = 0; i < queryTimes; i++) {
+				resultCheck[i] = [];
+			}
+			// get user friends' information
+			getFriendsInfo(friendsList);
+		}
+		else {
+			console.log("failed to get user friends list");
+		}
+	});
+ 
+	/*
+	FB.api('/me/feed', function(response) {
+		if (response && !response.error) {
+			//console.log(response.data[1]);
+			for(var i = 0; i < response.data.length; i++) {
+				//console.log(response.data[i].story);			
+			}
+		}
+	});*/
+}
+
+function getFriendsInfo(friendsList) {
+	var numOfFriend = 0;
+	console.log("query for : ");
+	for(var i = 0; i < queryFriends; i++) {
+		console.log(i + " : " + friendsList[i].name);
+	}
+
+	do {
+		queryCommand(friendsList, numOfFriend);
+		numOfFriend++; // iterate to next person
+	} while (numOfFriend != queryFriends); 
+}
+
+// query 4 times
+function queryCommand(friendsList, numOfFriend) {
+	// I don't know why FB just gives at most 22 results for one query ,
+	// so I have to divide one long-period query into small pieces.
+	getMorePost("2014-04-15", "2014-05-03", friendsList, numOfFriend, 0);
+	getMorePost("2014-04-01", "2014-04-15", friendsList, numOfFriend, 1);
+	getMorePost("2014-03-15", "2014-03-31", friendsList, numOfFriend, 2);
+	getMorePost("2014-03-01", "2014-03-14", friendsList, numOfFriend, 3);	
+}
+
+function getMorePost(since, until, friendsList, numOfFriend, queryOrder) {
+	FB.api('/' + friendsList[numOfFriend].id + '/feed?since=' 
+			+ since + '&until=' + until, function(response) {
+
+		console.log(friendsList[numOfFriend].name + " : " + since + " ~ " + until + ":");
+		console.log(response);
+		if (response && !response.error) {
+			// one query for a person is done, so fill one block of 
+			// the resultCheck and resultList
+ 			resultCheck[numOfFriend][queryOrder] = true;
+ 			resultList[numOfFriend][queryOrder] = getResult(response);	
+ 			
+ 			// check if all query for a person is done
+ 			checkAllDone(friendsList, response, numOfFriend);	
+		}
+		else {
+			console.log("response error(query times limitation.)");
+		}
+	});
+}
+
+function getResult(response) {
+	var result = "";
+	for(var i = 0; i < response.data.length; i++) {
+		result += "Create_Time : " + response.data[i].created_time + "\n";
+		result += "Message : " + response.data[i].message + "\n"; // user post
+		result += "Description : " + response.data[i].description + "\n";  // user shared description
+		result += "Story : " + response.data[i].story + "\n"; // user like and user comments
+		//document.getElementById("friends").innerHTML += result;
+	}	
+	return result;
+}
+
+var count = 0;  // file number
+
+function checkAllDone(friendsList, response, numOfFriend) {
+	var done = 0; // if all query for person is done, then done === queryTimes
+	// check query for one person is done	
+	for (var i = 0; i < queryTimes; i++) {
+		if (resultCheck[numOfFriend][i] === true) {
+			done++;
+		}
+	}
+	
+	var result;
+	// combine all query for one person into one.
+	if (done === queryTimes) {
+		var friendName = friendsList[numOfFriend].name;
+		console.log("Done : query for " + friendName +" ."); 
+		result = "Name : " + friendName + "\n";
+		// combine
+		for(var i = 0; i < queryTimes; i++) {
+			result += resultList[numOfFriend][i];	
+		}
+		
+		count++;
+
+		// create file
+		var blob = new Blob([result], {type: "text/plain;charset=utf-8"});
+		var fileName = count + "." + friendName + ".txt";
+		saveAs(blob, fileName);	
+	}
+}
+
+function getPhoto() {
+	FB.api('/me/picture?type=normal', function(response) {
+		var str="<br/><b>Pic</b> : <img src='"+response.data.url+"'/>";
+		document.getElementById("userInfo").innerHTML+=str;
+	});
+}
+ 
+function Logout() {
+	FB.logout(function(){document.location.reload();});
+}
+ 
+// Load the SDK asynchronously
+(function(d){
+	var js, id = 'facebook-jssdk', ref = d.getElementsByTagName('script')[0];
+	if (d.getElementById(id)) {return;}
+	js = d.createElement('script'); js.id = id; js.async = true;
+	js.src = "//connect.facebook.net/en_US/all.js";
+	ref.parentNode.insertBefore(js, ref);
+}(document));
+ 
+</script>
+<div>
+<h2>Facebook OAuth Javascript Demo</h2>
+ 
+<div id="userInfo">
+<p><b>Click on Below Image to start the demo: </b></p>
+<img src="LoginWithFacebook.png" style="cursor:pointer;" onclick="Login()"/>
+</div>
+<h3>Friends:</h3>
+<div id="friends"></div>
+ 
+</div>
+</body>
+</html>
