@@ -7,7 +7,6 @@
 var resultList    = [[]];  // query result will be store in here 
 var resultCheck   = [[]];  // check queries for one person are all done
 var queryTimes    = 4;     // query times
-var queryFriends  = 5;     // total number of friends you want to query for
 var friendsTotal  = 0;     // record friends numbers
 
 
@@ -88,11 +87,9 @@ function getUserInfo() {
 			// definite 2-d array space for resultList
 			for (var i = 0; i < friendsList.length; i++) {
 				resultList[i] = [];
-			}
-			// definite 2-d array space for resultCheck
-			for (var i = 0; i < queryTimes; i++) {
 				resultCheck[i] = [];
 			}
+
 			// get user friends' information
 			getFriendsInfo(friendsList);
 		}
@@ -114,15 +111,17 @@ function getUserInfo() {
 
 function getFriendsInfo(friendsList) {
 	var numOfFriend = 0;
+	var queryFriendsLimit = 10;
+	
 	console.log("query for : ");
-	for(var i = 0; i < queryFriends; i++) {
+	for(var i = 0; i < queryFriendsLimit; i++) {
 		console.log(i + " : " + friendsList[i].name);
 	}
 
 	do {
 		queryCommand(friendsList, numOfFriend);
 		numOfFriend++; // iterate to next person
-	} while (numOfFriend != queryFriends); 
+	} while (numOfFriend != queryFriendsLimit); 
 }
 
 // query 4 times
